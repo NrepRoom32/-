@@ -1,350 +1,599 @@
-import React, { useState } from 'react';
-import { Search, Download, FileText, Table2 } from 'lucide-react';
-
-const PackageSubscriptionAnalyzer = () => {
-  const [subscriptionData, setSubscriptionData] = useState('');
-  const [checkData, setCheckData] = useState('');
-  const [results, setResults] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // ຟັງຊັນແປງວັນທີຈາກ DD/MM/YYYY-HH:MM ເປັນ YYYYMMDD
-  const parseDate = (dateStr) => {
-    try {
-      // ຖ້າເປັນຮູບແບບ DD/MM/YYYY-HH:MM
-      if (dateStr.includes('/') && dateStr.includes('-')) {
-        const [datePart] = dateStr.split('-');
-        const [day, month, year] = datePart.split('/');
-        return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
-      }
-      // ຖ້າເປັນຮູບແບບ YYYYMMDD ແລ້ວ
-      if (dateStr.length === 8 && !isNaN(dateStr)) {
-        return dateStr;
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
-  };
-
-  // ຟັງຊັນແປງໝາຍເລກໂທ (ເອົາ 85620 ອອກ)
-  const normalizePhoneNumber = (phone) => {
-    if (!phone) return '';
-    const cleanPhone = phone.toString().replace(/[^0-9]/g, '');
-    if (cleanPhone.startsWith('85620')) {
-      return cleanPhone.substring(3); // ເອົາ 856 ອອກ
-    }
-    return cleanPhone;
-  };
-
-  // ຟັງຊັນປະມວນຜົນຂໍ້ມູນ
-  const processData = () => {
-    if (!subscriptionData.trim() || !checkData.trim()) {
-      alert('ກະລຸນາໃສ່ຂໍ້ມູນໃຫ້ຄົບຖ້ວນ');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // ແປງຂໍ້ມູນການສະໝັກ
-      const subscriptionLines = subscriptionData.trim().split('\n');
-      const subscriptions = [];
-      
-      subscriptionLines.forEach((line, index) => {
-        if (index === 0) return; // ຂ້າມແຖວຫົວຕາຕະລາງ
-        const parts = line.split('\t');
-        if (parts.length >= 2) {
-          subscriptions.push({
-            date: parts[0],
-            phone: normalizePhoneNumber(parts[1])
-          });
-        }
-      });
-
-      // ແປງຂໍ້ມູນທີ່ຕ້ອງກວດສອບ
-      const checkLines = checkData.trim().split('\n');
-      const checksToProcess = [];
-      
-      checkLines.forEach((line, index) => {
-        if (index === 0) return; // ຂ້າມແຖວຫົວຕາຕະລາງ
-        const parts = line.split('\t');
-        if (parts.length >= 2) {
-          checksToProcess.push({
-            originalDate: parts[0],
-            date: parseDate(parts[0]),
-            phone: normalizePhoneNumber(parts[1]),
-            originalPhone: parts[1]
-          });
-        }
-      });
-
-      // ປະມວນຜົນການກວດສອບ
-      const analysisResults = checksToProcess.map(check => {
-        // ຫາການສະໝັກທີ່ກົງກັນທັງວັນທີແລະໝາຍເລກ
-        const exactMatch = subscriptions.find(sub => 
-          sub.date === check.date && sub.phone === check.phone
-        );
-
-        // ຫາການສະໝັກທີ່ມີໝາຍເລກດຽວກັນແຕ່ວັນທີຕ່າງກັນ
-        const phoneMatches = subscriptions.filter(sub => sub.phone === check.phone);
-        
-        let status = 'ບໍ່ພົບ';
-        let note = '';
-
-        if (exactMatch) {
-          status = 'ພົບ';
-          note = `ມີການສະໝັກວັນທີ ${check.date}`;
-        } else if (phoneMatches.length > 0) {
-          status = 'ບໍ່ພົບ';
-          const otherDates = [...new Set(phoneMatches.map(m => m.date))];
-          note = `ມີການສະໝັກໃນວັນອື່ນ: ${otherDates.join(', ')}`;
-        } else {
-          note = 'ບໍ່ພົບໝາຍເລກນີ້ໃນຂໍ້ມູນການສະໝັກທັງໝົດ';
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ເຄື່ອງມືວິເຄາະຂໍ້ມູນການສະໝັກບໍລິການ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        return {
-          checkDate: check.originalDate,
-          phoneNumber: check.originalPhone,
-          status: status,
-          note: note
-        };
-      });
+        body {
+            font-family: 'Noto Sans Lao', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-      setResults(analysisResults);
-    } catch (error) {
-      alert('ເກີດຂໍ້ຜິດພາດໃນການປະມວນຜົນຂໍ້ມູນ: ' + error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
 
-  // ຟັງຊັນ Export ເປັນ CSV
-  const exportToCSV = () => {
-    if (results.length === 0) {
-      alert('ບໍ່ມີຂໍ້ມູນທີ່ຈະ export');
-      return;
-    }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
 
-    const headers = ['ວັນທີກວດສອບ', 'ໝາຍເລກທີ່ຕ້ອງການກວດສອບ', 'ສະຖານະການສະໝັກ', 'ໝາຍເຫດ'];
-    const csvContent = [
-      headers.join(','),
-      ...results.map(row => [
-        `"${row.checkDate}"`,
-        `"${row.phoneNumber}"`,
-        `"${row.status}"`,
-        `"${row.note}"`
-      ].join(','))
-    ].join('\n');
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
 
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `ການວິເຄາະການສະໝັກແພັກເກັດ_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
 
-  // ຟັງຊັນ Export ເປັນ Excel format
-  const exportToExcel = () => {
-    if (results.length === 0) {
-      alert('ບໍ່ມີຂໍ້ມູນທີ່ຈະ export');
-      return;
-    }
+        .content {
+            padding: 30px;
+        }
 
-    const headers = ['ວັນທີກວດສອບ', 'ໝາຍເລກທີ່ຕ້ອງການກວດສອບ', 'ສະຖານະການສະໝັກ', 'ໝາຍເຫດ'];
-    let excelContent = '<table border="1">';
-    excelContent += '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
-    
-    results.forEach(row => {
-      excelContent += '<tr>';
-      excelContent += `<td>${row.checkDate}</td>`;
-      excelContent += `<td>${row.phoneNumber}</td>`;
-      excelContent += `<td>${row.status}</td>`;
-      excelContent += `<td>${row.note}</td>`;
-      excelContent += '</tr>';
-    });
-    excelContent += '</table>';
+        .input-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 2px solid #e9ecef;
+        }
 
-    const blob = new Blob(['\ufeff' + excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `ການວິເຄາະການສະໝັກແພັກເກັດ_${new Date().toISOString().split('T')[0]}.xls`;
-    link.click();
-  };
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
 
-  return (
-    <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center justify-center gap-3">
-            <Table2 className="text-blue-600" size={32} />
-            ເຄື່ອງມືວິເຄາະຂໍ້ມູນການສະໝັກແພັກເກັດ
-          </h1>
-          <p className="text-gray-600">ກວດສອບການສະໝັກແພັກເກັດຕາມໝາຍເລກໂທແລະວັນທີທີ່ກຳນົດ</p>
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-group label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #495057;
+            font-size: 1.1rem;
+        }
+
+        .input-group textarea {
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+            resize: vertical;
+            min-height: 200px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .analyze-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .analyze-btn:active {
+            transform: translateY(0);
+        }
+
+        .results-section {
+            background: #fff;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            overflow: hidden;
+        }
+
+        .results-header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .results-header h2 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .found {
+            background-color: #d4edda !important;
+            color: #155724;
+        }
+
+        .not-found {
+            background-color: #f8d7da !important;
+            color: #721c24;
+        }
+
+        .found-other-date {
+            background-color: #fff3cd !important;
+            color: #856404;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-found {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .badge-not-found {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .badge-other-date {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .summary {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .input-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 ເຄື່ອງມືວິເຄາະຂໍ້ມູນການສະໝັກບໍລິການ</h1>
+            <p>ກວດສອບຂໍ້ມູນການສະໝັກແພັກເກັດຂອງໝາຍເລກໂທລະສັບ ແລະ ວັນທີທີ່ກຳນົດ</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* ກ່ອງທີ 1: ຂໍ້ມູນການສະໝັກ */}
-          <div className="space-y-3">
-            <label className="block text-lg font-semibold text-gray-700 flex items-center gap-2">
-              <FileText size={20} className="text-blue-600" />
-              ກ່ອງທີ 1: ຂໍ້ມູນລາຍການສະໝັກແພັກເກັດທັງໝົດ
-            </label>
-            <textarea
-              value={subscriptionData}
-              onChange={(e) => setSubscriptionData(e.target.value)}
-              placeholder="ວັນທີ	ໝາຍເລກ	ຈຳນວນຄັ້ງສະໝັກ	ລາຄາແພັກເກັດ	ຊື່ແພັກເກັດ	ຊ່ອງທາງ
-20250603	205155xxxx	1	10000	10000/4.5GB/3day	USSD
-20250604	205155xxxx	1	10000	10000/4.5GB/3day	USSD
-..."
-              className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-            />
-            <p className="text-sm text-gray-500">
-              * Copy ແລະ paste ຂໍ້ມູນຈາກ Excel ຫຼື CSV (ຄັ້ນດ້ວຍ Tab)
-            </p>
-          </div>
-
-          {/* ກ່ອງທີ 2: ລາຍການກວດສອບ */}
-          <div className="space-y-3">
-            <label className="block text-lg font-semibold text-gray-700 flex items-center gap-2">
-              <Search size={20} className="text-green-600" />
-              ກ່ອງທີ 2: ລາຍການເບີແລະວັນທີທີ່ຕ້ອງກວດ
-            </label>
-            <textarea
-              value={checkData}
-              onChange={(e) => setCheckData(e.target.value)}
-              placeholder="ວັນທີ	ໝາຍເລກ
-04/06/2025-11:27	856205199xxxx
-05/06/2025-00:00	856205443xxxx
-05/06/2025-11:29	205579xxxx
-..."
-              className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
-            />
-            <p className="text-sm text-gray-500">
-              * ຮູບແບບວັນທີ: DD/MM/YYYY-HH:MM ຫຼື YYYYMMDD
-            </p>
-          </div>
-        </div>
-
-        {/* ປຸ່ມກວດສອບ */}
-        <div className="text-center mb-8">
-          <button
-            onClick={processData}
-            disabled={isProcessing}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-8 rounded-lg transition-colors duration-200 flex items-center gap-2 mx-auto"
-          >
-            <Search size={20} />
-            {isProcessing ? 'ກຳລັງປະມວນຜົນ...' : 'ເລີ່ມກວດສອບ'}
-          </button>
-        </div>
-
-        {/* ຜົນການກວດສອບ */}
-        {results.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-800">ຜົນການກວດສອບ</h2>
-              <div className="flex gap-3">
-                <button
-                  onClick={exportToCSV}
-                  className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                >
-                  <Download size={16} />
-                  Export CSV
-                </button>
-                <button
-                  onClick={exportToExcel}
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                >
-                  <Download size={16} />
-                  Export Excel
-                </button>
-              </div>
+        <div class="content">
+            <div class="input-section">
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="subscriptionData">📊 ຂໍ້ມູນລາຍການສະໝັກແພັກເກັດ:</label>
+                        <textarea id="subscriptionData" placeholder="ໃສ່ຂໍ້ມູນການສະໝັກທັງໝົດ (adate, time, kip, pk_name, chanel)..."></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label for="checkData">🔍 ເບີໂທລະສັບ ແລະ ວັນທີທີ່ຕ້ອງການກວດສອບ:</label>
+                        <textarea id="checkData" placeholder="ໃສ່ວັນທີ-ເວລາ ແລະ ໝາຍເລກໂທລະສັບທີ່ຕ້ອງການກວດສອບ..."></textarea>
+                    </div>
+                </div>
+                <button class="analyze-btn" onclick="analyzeData()">🚀 ເລີ່ມການວິເຄາະ</button>
             </div>
 
-            <div className="overflow-x-auto bg-white rounded-lg border">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ວັນທີກວດສອບ
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ໝາຍເລກທີ່ຕ້ອງການກວດສອບ
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ສະຖານະການສະໝັກ
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ໝາຍເຫດ
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {results.map((row, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.checkDate}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                        {row.phoneNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          row.status === 'ພົບ' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {row.note}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div id="results" class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2>📋 ຜົນການວິເຄາະ</h2>
+                    <p>ລາຍງານການສະໝັກແພັກເກັດທີ່ພົບ</p>
+                </div>
+                <div class="table-container">
+                    <table id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>ວັນທີກວດສອບ</th>
+                                <th>ໝາຍເລກທີ່ຕ້ອງການກວດສອບ</th>
+                                <th>ຈຳນວນຄັ້ງສະໝັກ</th>
+                                <th>ລາຄາແພັກເກັດ</th>
+                                <th>ຊື່ແພັກເກັດ</th>
+                                <th>ຊ່ອງທາງ</th>
+                                <th>ໝາຍເຫດ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="summary" id="summary">
+                </div>
             </div>
-
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-800 mb-2">ສະຫລຸບຜົນການວິເຄາະ:</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div className="bg-white p-3 rounded border-l-4 border-green-500">
-                  <div className="font-semibold text-green-700">ພົບການສະໝັກ</div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {results.filter(r => r.status === 'ພົບ').length}
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded border-l-4 border-red-500">
-                  <div className="font-semibold text-red-700">ບໍ່ພົບການສະໝັກ</div>
-                  <div className="text-2xl font-bold text-red-600">
-                    {results.filter(r => r.status === 'ບໍ່ພົບ').length}
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded border-l-4 border-blue-500">
-                  <div className="font-semibold text-blue-700">ທັງໝົດ</div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {results.length}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ຄຳແນະນຳການໃຊ້ງານ */}
-        <div className="mt-8 bg-gray-50 p-4 rounded-lg">
-          <h3 className="font-semibold text-gray-700 mb-2">ຄຳແນະນຳການໃຊ້ງານ:</h3>
-          <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-            <li>Copy ຂໍ້ມູນຈາກ Excel ຫຼື CSV ໂດຍລວມຫົວຕາຕະລາງ</li>
-            <li>ຂໍ້ມູນຕ້ອງຄັ້ນກັນດ້ວຍ Tab (ໃຊ້ Ctrl+C, Ctrl+V ຈາກ Excel)</li>
-            <li>ວັນທີສາມາດເປັນຮູບແບບ DD/MM/YYYY-HH:MM ຫຼື YYYYMMDD</li>
-            <li>ໝາຍເລກໂທສາມາດມີ ຫຼື ບໍ່ມີຄຳນຳໜ້າ 85620 ກໍໄດ້</li>
-            <li>ສາມາດ Export ຜົນການວິເຄາະເປັນ CSV ຫຼື Excel ໄດ້</li>
-          </ul>
         </div>
-      </div>
     </div>
-  );
-};
 
-export default PackageSubscriptionAnalyzer;
+    <script>
+        // ຕົວຢ່າງຂໍ້ມູນເບື້ອງຕົ້ນ
+        const sampleSubscriptionData = `adate		time	kip	pk_name	chanel
+20250606	20x15xx922	1	10000	10000/4.5GB/3day	USSD
+20250607	20x15xx922	1	10000	10000/4.5GB/3day	USSD
+20250609	20x15xx922	1	10000	10000/4.5GB/3day	USSD
+20250610	20x15xx922	1	10000	10000/4.5GB/3day	USSD
+20250612	20x15xx922	1	10000	10000/4.5GB/3day	USSD
+20250608	20x17xx580	1	10000	10000/4.5GB/3day	USSD
+20250611	20x17xx580	1	10000	10000/4.5GB/3day	USSD
+20250608	20x23xx783	1	15000	15000/IR/1day	USSD
+20250606	20x42xx977	1	10000	10000/4.5GB/3day	USSD
+20250609	20x42xx977	1	10000	10000/4.5GB/3day	USSD
+20250612	20x42xx977	1	5000	5000/1GB/1day	USSD
+20250612	20x42xx977	1	10000	10000/4.5GB/3day	USSD
+20250606	20x42xx460	1	10000	10000/4.5GB/3day	USSD
+20250608	20x42xx460	1	10000	10000/4.5GB/3day	USSD
+20250610	20x42xx460	1	10000	10000/4.5GB/3day	USSD
+20250607	20x45xx364	1	10000	10000/4.5GB/3day	USSD
+20250610	20x45xx364	1	10000	10000/4.5GB/3day	USSD
+20250606	20x60xx335	1	10000	10000/4.5GB/3day	USSD
+20250606	20x60xx335	1	120000	IR120000/20GB/7day	USSD
+20250609	20x60xx335	1	10000	10000/4.5GB/3day	USSD
+20250610	20x60xx335	1	10000	10000/4.5GB/3day	USSD
+20250612	20x60xx335	1	60000	IR_MLS_60000/20GB/5day	USSD
+20250607	20x64xx364	1	5000	5000/1GB/2day_559_code6	USSD
+20250608	20x64xx364	1	5000	5000/1GB/2day_559_code6	USSD
+20250611	20x64xx364	1	5000	5000/1GB/2day_559_code6	USSD
+20250611	20x64xx364	1	5000	5000/1GB/2day_559_code6	USSD
+20250606	20x66xx504	1	10000	10000/4.5GB/3day	USSD
+20250608	20x66xx504	1	10000	10000/4.5GB/3day	USSD
+20250610	20x66xx504	1	10000	10000/4.5GB/3day	USSD
+20250607	20x66xx949	1	5000	5000/125MB/1day	USSD
+20250607	20x66xx949	1	35000	35000/15GBnonstop/30days	USSD
+20250606	20x67xx866	1	10000	10000/4.5GB/3day	USSD
+20250609	20x67xx866	1	10000	10000/E-sport/3GB/5day	USSD
+20250610	20x67xx866	1	10000	10000/4.5GB/3day	USSD
+20250608	20x68xx639	1	10000	10000/4.5GB/3day	USSD
+20250611	20x68xx639	1	10000	10000/4.5GB/3day	USSD
+20250608	20x69xx751	1	35000	35000/10GB/10Day_freeApp	USSD
+20250610	20x70xx310	1	35000	35000/10GB/10Day_freeApp	USSD
+20250607	20x70xx657	1	10000	10000/3GB/5day	USSD
+20250610	20x70xx657	1	25000	25000_non_stop/10GB/10day	USSD
+20250608	20x70xx346	1	10000	10000/4.7GB/6day	USSD
+20250611	20x70xx346	1	10000	10000/4.7GB/6day	USSD
+20250606	20x71xx959	1	15000	15000/10GB/3day_code291	USSD
+20250609	20x71xx959	1	10000	10000/4.5GB/3day	USSD
+20250612	20x71xx959	1	10000	10000/3GB/5day	USSD
+20250607	20x72xx951	1	15000	15000/IR/1day	USSD
+20250611	20x72xx979	1	10000	10000/4.5GB/3day	USSD
+20250606	20x75xx657	1	10000	10000/4.7GB/6day	USSD
+20250608	20x75xx657	1	10000	10000/4.7GB/6day	USSD
+20250608	20x75xx657	1	10000	10000/4.7GB/6day	USSD
+20250609	20x75xx657	1	10000	10000/4.7GB/6day	USSD
+20250611	20x75xx657	1	10000	10000/4.7GB/6day	USSD
+20250612	20x75xx657	1	10000	10000/4.7GB/6day	USSD
+20250610	20x77xx223	1	15000	15000/IR/1day	USSD
+20250607	20x79xx133	1	10000	10000/4.5GB/3day	USSD
+20250609	20x79xx133	1	10000	10000/4.5GB/3day	USSD
+20250609	20x79xx133	1	10000	10000/4.5GB/3day	USSD
+20250612	20x79xx133	1	10000	10000/4.5GB/3day	USSD
+20250609	20x83xx995	1	10000	10000/4.7GB/6day	USSD
+20250609	20x83xx995	1	10000	10000/4.7GB/6day	USSD
+20250606	20x85xx594	1	10000	10000/3GB/7day_559_code7	USSD
+20250607	20x85xx076	1	10000	10000/4.5GB/3day	USSD
+20250609	20x85xx076	1	10000	10000/4.5GB/3day	USSD
+20250611	20x85xx076	1	10000	10000/4.5GB/3day	USSD
+20250606	20x88xx749	1	35000	35000/10GB/10Day_freeApp	USSD
+20250609	20x88xx749	1	35000	35000/10GB/10Day_freeApp	USSD
+20250612	20x88xx749	1	35000	35000/10GB/10Day_freeApp	USSD
+20250610	20x91xx565	1	40000	40000/IR/3day	USSD
+20250607	20x95xx373	1	10000	10000/4.5GB/3day	USSD
+20250611	20x95xx373	1	10000	10000/4.5GB/3day	USSD`;
+
+        const sampleCheckData = `10/06/2025-17:53	20x28xx021
+09/06/2025-10:10	20x55xx277
+10/06/2025-16:43	20x86xx445
+10/06/2025-11:11	20x91xx565
+08/06/2025-07:04	20x23xx783
+10/06/2025-06:06	20x46xx539
+10/06/2025-21:47	20x55xx710
+09/06/2025-18:45	20x56xx936
+06/06/2025-14:54	20x58xx558
+07/06/2025-11:23	20x58xx507
+06/06/2025-13:10	20x60xx335
+08/06/2025-00:48	20x64xx364
+09/06/2025-05:19	20x72xx979
+09/06/2025-14:19	20x74xx742
+06/06/2025-17:49	20x85xx594
+12/06/2025-14:36	20x85xx076
+12/06/2025-12:07	20x95xx373`;
+
+        // ໃສ່ຂໍ້ມູນຕົວຢ່າງເມື່ອໂຫຼດໜ້າ
+        window.onload = function() {
+            document.getElementById('subscriptionData').value = sampleSubscriptionData;
+            document.getElementById('checkData').value = sampleCheckData;
+        };
+
+        function normalizePhoneNumber(phone) {
+            // ລຶບ prefix 85620 ຖ້າມີ
+            let normalized = phone.replace(/^85620/, '');
+            // ແທນທີ່ x ດ້ວຍ wildcard pattern
+            return normalized.replace(/x/g, '.');
+        }
+
+        function phoneMatches(phone1, phone2) {
+            const pattern1 = normalizePhoneNumber(phone1);
+            const pattern2 = normalizePhoneNumber(phone2);
+            
+            const regex1 = new RegExp('^' + pattern1 + '$');
+            const regex2 = new RegExp('^' + pattern2 + '$');
+            
+            return regex1.test(pattern2) || regex2.test(pattern1);
+        }
+
+        function parseDate(dateStr) {
+            // ແປງຈາກ DD/MM/YYYY-HH:MM ເປັນ YYYYMMDD
+            const parts = dateStr.split('-')[0].split('/');
+            return '2025' + parts[1].padStart(2, '0') + parts[0].padStart(2, '0');
+        }
+
+        function formatDate(dateStr) {
+            // ແປງຈາກ YYYYMMDD ເປັນ DD/MM/YYYY
+            const year = dateStr.substring(0, 4);
+            const month = dateStr.substring(4, 6);
+            const day = dateStr.substring(6, 8);
+            return `${day}/${month}/${year}`;
+        }
+
+        function analyzeData() {
+            const subscriptionData = document.getElementById('subscriptionData').value;
+            const checkData = document.getElementById('checkData').value;
+
+            if (!subscriptionData.trim() || !checkData.trim()) {
+                alert('ກະລຸນາໃສ່ຂໍ້ມູນທັງສອງຊ່ອງ');
+                return;
+            }
+
+            // Parse subscription data
+            const subscriptions = [];
+            const subscriptionLines = subscriptionData.trim().split('\n').slice(1); // Skip header
+            
+            subscriptionLines.forEach(line => {
+                const parts = line.trim().split('\t');
+                if (parts.length >= 5) {
+                    subscriptions.push({
+                        date: parts[0],
+                        phone: parts[1],
+                        count: parts[2],
+                        price: parts[3],
+                        package: parts[4],
+                        channel: parts[5] || 'USSD'
+                    });
+                }
+            });
+
+            // Parse check data
+            const checksToPerform = [];
+            const checkLines = checkData.trim().split('\n');
+            
+            checkLines.forEach(line => {
+                const parts = line.trim().split('\t');
+                if (parts.length >= 2) {
+                    checksToPerform.push({
+                        datetime: parts[0],
+                        phone: parts[1],
+                        date: parseDate(parts[0])
+                    });
+                }
+            });
+
+            // Perform analysis
+            const results = [];
+            let foundCount = 0;
+            let notFoundCount = 0;
+            let otherDateCount = 0;
+
+            checksToPerform.forEach(check => {
+                // ຊັອກຫາການສະໝັກໃນວັນທີທີ່ກຳນົດ
+                const exactMatches = subscriptions.filter(sub => 
+                    sub.date === check.date && phoneMatches(sub.phone, check.phone)
+                );
+
+                if (exactMatches.length > 0) {
+                    // ພົບການສະໝັກໃນວັນທີທີ່ກວດສອບ
+                    exactMatches.forEach(match => {
+                        results.push({
+                            checkDate: formatDate(check.date),
+                            checkPhone: check.phone,
+                            count: match.count,
+                            price: match.price,
+                            package: match.package,
+                            channel: match.channel,
+                            status: 'ພົບ',
+                            statusClass: 'found'
+                        });
+                    });
+                    foundCount++;
+                } else {
+                    // ຊອກຫາການສະໝັກໃນວັນທີອື່ນ
+                    const otherMatches = subscriptions.filter(sub => 
+                        phoneMatches(sub.phone, check.phone)
+                    );
+
+                    if (otherMatches.length > 0) {
+                        // ພົບການສະໝັກໃນວັນທີອື່ນ
+                        otherMatches.forEach(match => {
+                            results.push({
+                                checkDate: formatDate(check.date),
+                                checkPhone: check.phone,
+                                count: match.count,
+                                price: match.price,
+                                package: match.package,
+                                channel: match.channel,
+                                status: 'ພົບໃນວັນທີອື່ນ (' + formatDate(match.date) + ')',
+                                statusClass: 'found-other-date'
+                            });
+                        });
+                        otherDateCount++;
+                    } else {
+                        // ບໍ່ພົບການສະໝັກເລີຍ
+                        results.push({
+                            checkDate: formatDate(check.date),
+                            checkPhone: check.phone,
+                            count: '-',
+                            price: '-',
+                            package: '-',
+                            channel: '-',
+                            status: 'ບໍ່ພົບ',
+                            statusClass: 'not-found'
+                        });
+                        notFoundCount++;
+                    }
+                }
+            });
+
+            displayResults(results, foundCount, notFoundCount, otherDateCount, checksToPerform.length);
+        }
+
+        function displayResults(results, foundCount, notFoundCount, otherDateCount, totalChecks) {
+            const resultsSection = document.getElementById('results');
+            const resultsBody = document.getElementById('resultsBody');
+            const summary = document.getElementById('summary');
+
+            // Clear previous results
+            resultsBody.innerHTML = '';
+
+            // Add results to table
+            results.forEach(result => {
+                const row = document.createElement('tr');
+                row.className = result.statusClass;
+                
+                row.innerHTML = `
+                    <td>${result.checkDate}</td>
+                    <td>${result.checkPhone}</td>
+                    <td>${result.count}</td>
+                    <td>${result.price}</td>
+                    <td>${result.package}</td>
+                    <td>${result.channel}</td>
+                    <td><span class="status-badge badge-${result.statusClass.replace('-', '-')}">${result.status}</span></td>
+                `;
+                
+                resultsBody.appendChild(row);
+            });
+
+            // Create summary
+            summary.innerHTML = `
+                <h3 style="margin-bottom: 15px; color: #495057;">📊 ສະຫຼુບຜົນການວິເຄາະ</h3>
+                <div class="summary-stats">
+                    <div class="stat-card">
+                        <div class="stat-number">${totalChecks}</div>
+                        <div class="stat-label">ທັງໝົດທີ່ກວດສອບ</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" style="color: #28a745;">${foundCount}</div>
+                        <div class="stat-label">ພົບໃນວັນທີກຳນົດ</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" style="color: #ffc107;">${otherDateCount}</div>
+                        <div class="stat-label">ພົບໃນວັນທີອື່ນ</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" style="color: #dc3545;">${notFoundCount}</div>
+                        <div class="stat-label">ບໍ່ພົບເລີຍ</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${results.length}</div>
+                        <div class="stat-label">ລາຍການທັງໝົດ</div>
+                    </div>
+                </div>
+            `;
+
+            resultsSection.style.display = 'block';
+            resultsSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
